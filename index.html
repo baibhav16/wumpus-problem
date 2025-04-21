@@ -11,7 +11,7 @@
     }
     body {
       font-family: 'Press Start 2P', cursive;
-      background: linear-gradient(135deg, #0f0f0f, #1a1a1a, #2e2e2e);
+      background: linear-gradient(135deg, #0f0f0f, #1a1a1a, #441e01);
       color: white;
       display: flex;
       flex-direction: column;
@@ -170,24 +170,27 @@
     }
 
     function drawMap() {
-      grid.innerHTML = "";
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          const cell = createCell(x, y);
-          let emoji = '';
-
-         
-          if (map[y][x].breeze) emoji += '💨';
-          if (map[y][x].stench) emoji += '💩';
-          if (map[y][x].player) emoji += '🧍';
-
-          cell.textContent = emoji;
-          if (map[y][x].player) cell.classList.add("player-enter");
-          if (map[y][x].gold) cell.classList.add("gold");
-          grid.appendChild(cell);
-        }
+  grid.innerHTML = "";
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const cell = createCell(x, y);
+      let emoji = '';
+      if (map[y][x].player) emoji += '🧍';
+      // Show the emojis only when the player is on this tile
+      if (map[y][x].player) {
+        if (map[y][x].breeze) emoji += '💨';
+        if (map[y][x].stench) emoji += '💩';
+        if (map[y][x].gold) emoji += '💰';
       }
+
+      cell.textContent = emoji;
+      if (map[y][x].player) cell.classList.add("player-enter");
+      if (map[y][x].gold) cell.classList.add("gold");
+      grid.appendChild(cell);
     }
+  }
+}
+
 
     function getRandomEmptyCell() {
       let emptyCells = [];
