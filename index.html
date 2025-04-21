@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wumpus World Game</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Press Start 2P', cursive;
+      background: linear-gradient(135deg, #0f0f0f, #1a1a1a, #2e2e2e);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      margin: 0;
+    }
+    h1 {
+      margin-bottom: 10px;
+      font-size: 18px;
+      text-align: center;
+    }
+    .score {
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    .message {
+      margin-bottom: 15px;
+      font-size: 12px;
+      color: #ffcc00;
+      height: 30px;
+      text-align: center;
+      animation: fadeIn 1s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 80px);
+      grid-template-rows: repeat(4, 80px);
+      gap: 5px;
+      border: 2px solid white;
+      background-color: #1a1a1a;
+      padding: 5px;
+    }
+    .cell {
+      width: 80px;
+      height: 80px;
+      border: 1px solid #555;
+      background-color: #222;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      text-align: center;
+      position: relative;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .player-enter {
+      animation: pop 0.3s ease-in-out;
+    }
+    @keyframes pop {
+      0% { transform: scale(0.6); opacity: 0; }
+      100% { transform: scale(1.2); opacity: 1; }
+    }
+    .arrow-effect {
+      animation: flash 0.5s ease-in-out;
+    }
+    @keyframes flash {
+      0%, 100% { background-color: #222; }
+      50% { background-color: #f00; }
+    }
+    .wumpus-dead {
+      animation: fadeOut 1s ease forwards;
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; transform: scale(0); }
+    }
+    .controls {
+      margin-top: 20px;
+    }
+    .controls button {
+      padding: 10px;
+      margin: 5px;
+      background-color: #333;
+      color: white;
+      border: none;
+      font-family: inherit;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .controls button:hover {
+      background-color: #555;
+    }
+   
+    
+    @keyframes sparkle {
+      0%, 100% {
+        box-shadow: 0 0 5px #ffd700, 0 0 10px #ff0;
+        transform: scale(1);
+      }
+      50% {
+        box-shadow: 0 0 10px #fff700, 0 0 20px #ffcc00;
+        transform: scale(1.1);
+      }
+    }
+    @media screen and (max-width: 500px) {
+      .grid {
+        grid-template-columns: repeat(4, 60px);
+        grid-template-rows: repeat(4, 60px);
+      }
+      .cell {
+        width: 60px;
+        height: 60px;
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Wumpus World Game</h1>
+  <div class="score">Score: <span id="score">0</span></div>
+  <div class="message" id="message"></div>
+  <div class="grid" id="gameGrid"></div>
+  <div class="controls">
+    <button onclick="move('up')">Up</button>
+    <button onclick="move('down')">Down</button>
+    <button onclick="move('left')">Left</button>
+    <button onclick="move('right')">Right</button>
+    <button onclick="shoot()">Shoot</button>
+    <button onclick="restartGame()">Restart</button>
+  </div>
+  <audio id="winSound" src="win-sound-effect.mp3"></audio>
+  <audio id="loseSound" src="game-lose-2.mp3"></audio>
+  <audio id="shootSound" src="https://freesound.org/data/previews/257/257229_4486188-lq.mp3"></audio>
+  <script>
+    const grid = document.getElementById("gameGrid");
+    const scoreSpan = document.getElementById("score");
+    const message = document.getElementById("message");
+    const winSound = document.getElementById("winSound");
+    const loseSound = document.getElementById("loseSound");
+    const shootSound = document.getElementById("shootSound");
+    const size = 4;
+    let map = [];
+    let player;
+    let score = 0;
+
+    function showMessage(text) {
+      message.textContent = text;
+      message.style.animation = 'fadeIn 1s ease-in-out';
+    }
+
+    function updateScore(value) {
+      score += value;
+      scoreSpan.textContent = score;
+    }
+
+    function createCell(x, y) {
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      cell.dataset.x = x;
+      cell.dataset.y = y;
+      return cell;
+    }
+
+    function drawMap() {
+      grid.innerHTML = "";
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          const cell = createCell(x, y);
+          let emoji = '';
+
+         
+          if (map[y][x].breeze) emoji += '💨';
+          if (map[y][x].stench) emoji += '💩';
+          if (map[y][x].player) emoji += '🧍';
+
+          cell.textContent = emoji;
+          if (map[y][x].player) cell.classList.add("player-enter");
+          if (map[y][x].gold) cell.classList.add("gold");
+          grid.appendChild(cell);
+        }
+      }
+    }
+
+    function getRandomEmptyCell() {
+      let emptyCells = [];
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          if (!map[y][x].pit && !map[y][x].wumpus && !map[y][x].gold && !(x === 0 && y === 3)) {
+            emptyCells.push([x, y]);
+          }
+        }
+      }
+      return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+    }
+
+    function initMap() {
+      score = 0;
+      updateScore(0);
+      map = [];
+      for (let y = 0; y < size; y++) {
+        const row = [];
+        for (let x = 0; x < size; x++) {
+          row.push({ breeze: false, stench: false, gold: false, pit: false, wumpus: false, player: false });
+        }
+        map.push(row);
+      }
+
+      for (let i = 0; i < 3; i++) {
+        let [px, py] = getRandomEmptyCell();
+        map[py][px].pit = true;
+      }
+
+      let [wx, wy] = getRandomEmptyCell();
+      map[wy][wx].wumpus = true;
+
+      let [gx, gy] = getRandomEmptyCell();
+      map[gy][gx].gold = true;
+
+      for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+          if (map[y][x].pit) addAdj(y, x, "breeze");
+          if (map[y][x].wumpus) addAdj(y, x, "stench");
+        }
+      }
+
+      player = { x: 0, y: 3, arrows: 1 };
+      map[player.y][player.x].player = true;
+    }
+
+    function addAdj(y, x, prop) {
+      const dirs = [[0,1],[0,-1],[1,0],[-1,0]];
+      for (let [dy, dx] of dirs) {
+        const ny = y + dy, nx = x + dx;
+        if (ny >= 0 && ny < size && nx >= 0 && nx < size) {
+          map[ny][nx][prop] = true;
+        }
+      }
+    }
+
+    function move(direction) {
+      const deltas = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+      const [dx, dy] = deltas[direction];
+      const nx = player.x + dx, ny = player.y + dy;
+      if (nx >= 0 && nx < size && ny >= 0 && ny < size) {
+        map[player.y][player.x].player = false;
+        player.x = nx;
+        player.y = ny;
+        map[player.y][player.x].player = true;
+        checkStatus();
+        drawMap();
+      }
+    }
+
+    function checkStatus() {
+      const cell = map[player.y][player.x];
+      if (cell.pit) {
+        loseSound.play();
+        showMessage("You fell in a pit! Game over.");
+        updateScore(-50);
+      } else if (cell.wumpus) {
+        loseSound.play();
+        showMessage("The Wumpus got you! Game over.");
+        updateScore(-100);
+      } else if (cell.gold) {
+        winSound.play();
+        showMessage("You found the gold! You win!");
+        updateScore(100);
+      } else {
+        showMessage("");
+      }
+    }
+
+    function shoot() {
+      if (player.arrows <= 0) {
+        showMessage("No arrows left!");
+        return;
+      }
+      player.arrows--;
+      shootSound.play();
+      const ahead = map[player.y]?.[player.x + 1];
+      if (ahead?.wumpus) {
+        ahead.wumpus = false;
+        showMessage("You shot the Wumpus!");
+        updateScore(50);
+      } else {
+        showMessage("You missed!");
+        updateScore(-10);
+      }
+      drawMap();
+    }
+
+    function restartGame() {
+      initMap();
+      drawMap();
+      showMessage("Game restarted!");
+    }
+
+    initMap();
+    drawMap();
+  </script>
+</body>
+</html>
